@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package lockbox;
+
+/** The contents of an encrypted lockbox file **/
+message EncryptedLockboxFile {
+  // Non-secret salt used to derive the master key
+  string master_key_salt = 1;
+
+  // The encrypted lockbox (container for passwords)
+  EncryptedObject lockbox = 2;
+}
+
+/** A lockbox which contains a set of encrytped passwords **/
+message Lockbox { repeated EncryptedPassword encrypted_passwords = 1; }
+
+/** An encrypted password. Only a subset of fields are encrypted -- the id, url
+ * and username fields are left as plaintext for  indexing/searching. */
+message EncryptedPassword {
+  string id = 1;
+  string url = 2;
+  string username = 3;
+
+  // A DecryptedPasswordFields message once decrypted
+  EncryptedObject encrypted_fields = 4;
+}
+
+/** Decrypted fields of a password **/
+message DecryptedPasswordFields {
+  string password = 1;
+  string notes = 2;
+}
+
+/** A generic encrypted object. Each object is encrypted with a
+ *  unique data key, which is in turn encrypted with the master password.
+ */
+message EncryptedObject {
+  EncryptedData encrypted_data = 1;
+  EncryptedData encrypted_data_key = 2;
+  EncryptionAlgorithm algorithm = 3;
+
+  enum EncryptionAlgorithm {
+    unknown_encryption_algorithm = 0;
+    libsodium_secretbox = 1;
+  }
+}
+
+message EncryptedData {
+  bytes ciphertext = 1;
+  bytes nonce = 2;
+}
