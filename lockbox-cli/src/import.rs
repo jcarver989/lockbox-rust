@@ -3,8 +3,12 @@ use serde::Deserialize;
 use std::error::Error;
 use std::path::Path;
 
+pub trait Importer {
+    fn import(file: &Path, lockbox: &mut Lockbox) -> Result<(), Box<dyn Error>>;
+}
+
 #[derive(Debug, Deserialize)]
-pub struct LastPassExportRecord {
+pub struct LastPassRecord {
     pub url: String,
     pub username: String,
     pub password: String,
@@ -16,22 +20,21 @@ pub struct LastPassExportRecord {
 }
 
 /// Imports a LastPass CSV file into a Lockbox file
-pub fn import_from_lastpass(
-    export_file: &Path,
-    lockbox: &mut Lockbox,
-) -> Result<(), Box<dyn Error>> {
-    let mut reader = csv::Reader::from_path(export_file)?;
-    for result in reader.deserialize::<LastPassExportRecord>() {
-        let record = result?;
-        let notes = if record.extra != "" {
-            Some(record.extra)
-        } else {
-            None
-        };
+impl Importer for LastPassRecord {
+    fn import(file: &Path, lockbox: &mut Lockbox) -> Result<(), Box<dyn Error>> {
+        let mut reader = csv::Reader::from_path(file)?;
+        for result in reader.deserialize::<LastPassRecord>() {
+            let record = result?;
+            let notes = if record.extra != "" {
+                Some(record.extra)
+            } else {
+                None
+            };
 
-        lockbox.add_password(record.url, record.username, record.password, notes)?;
+            lockbox.add_password(record.url, record.username, record.password, notes)?;
+        }
+
+        lockbox.save()?;
+        Ok(())
     }
-
-    lockbox.save()?;
-    Ok(())
 }

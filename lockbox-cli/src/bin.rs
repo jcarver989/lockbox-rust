@@ -1,33 +1,31 @@
 pub mod import;
 pub mod opt;
 use dirs::home_dir;
-use import::import_from_lastpass;
+use import::{Importer, LastPassRecord};
 use lockbox::error::Error;
 use lockbox::Lockbox;
 use opt::Opt;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
-const DEFAULT_LOCKBOX_NAME: &str = "lockbox";
-
 pub fn main() -> Result<(), Error> {
     let opt = Opt::from_args();
     match opt {
         Opt::New(command) => {
-            let path = get_filename(command.name.as_deref())?;
+            let path = get_lockbox_filename(command.name.as_deref())?;
             Lockbox::create(&path, &command.master_password)?;
             Ok(())
         }
 
         Opt::ImportLastPass(command) => {
-            let path = get_filename(command.name.as_deref())?;
+            let path = get_lockbox_filename(command.name.as_deref())?;
             let mut lockbox = Lockbox::create(&path, &command.master_password)?;
-            import_from_lastpass(&command.file, &mut lockbox).unwrap();
+            LastPassRecord::import(&command.file, &mut lockbox).unwrap();
             Ok(())
         }
 
         Opt::Add(command) => {
-            let path = get_filename(command.name.as_deref())?;
+            let path = get_lockbox_filename(command.name.as_deref())?;
             let mut lockbox = Lockbox::load(&path, &command.master_password)?;
             lockbox.add_password(
                 command.url,
@@ -40,7 +38,7 @@ pub fn main() -> Result<(), Error> {
         }
 
         Opt::Edit(command) => {
-            let path = get_filename(command.name.as_deref())?;
+            let path = get_lockbox_filename(command.name.as_deref())?;
             let mut lockbox = Lockbox::load(&path, &command.master_password)?;
             lockbox.edit_password(
                 command.id,
@@ -54,7 +52,7 @@ pub fn main() -> Result<(), Error> {
         }
 
         Opt::Get(command) => {
-            let path = get_filename(command.name.as_deref())?;
+            let path = get_lockbox_filename(command.name.as_deref())?;
             let mut lockbox = Lockbox::load(&path, &command.master_password)?;
             let passwords = lockbox.find_passwords(|p| {
                 command.id.as_ref().map_or(true, |id| p.id.eq(id))
@@ -80,7 +78,7 @@ pub fn main() -> Result<(), Error> {
         }
 
         Opt::List(command) => {
-            let path = get_filename(command.name.as_deref())?;
+            let path = get_lockbox_filename(command.name.as_deref())?;
             let lockbox = Lockbox::load(&path, &command.master_password)?;
             let passwords = lockbox.get_encrypted_passwords();
 
@@ -98,7 +96,8 @@ pub fn main() -> Result<(), Error> {
     }
 }
 
-fn get_filename(name: Option<&str>) -> Result<PathBuf, Error> {
+const DEFAULT_LOCKBOX_NAME: &str = "lockbox";
+fn get_lockbox_filename(name: Option<&str>) -> Result<PathBuf, Error> {
     let filename = format!("{}.protob", name.unwrap_or(DEFAULT_LOCKBOX_NAME));
     home_dir()
         .map(|dir| dir.join("lockbox").join(filename))
