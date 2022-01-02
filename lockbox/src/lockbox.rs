@@ -152,18 +152,17 @@ impl Lockbox {
         &self.lockbox.encrypted_passwords
     }
 
-    pub fn find_password_by_id(&mut self, id: &str) -> Option<DecryptedPassword> {
-        self.find_passwords(|p| p.id == id)
-            .first()
-            .map(|p| p.clone())
-    }
-
-    pub fn find_passwords_by_url(&mut self, url: &str) -> Vec<DecryptedPassword> {
-        self.find_passwords(|p| p.url.contains(url))
-    }
-
-    pub fn find_passwords_by_username(&mut self, username: &str) -> Vec<DecryptedPassword> {
-        self.find_passwords(|p| p.username.contains(username))
+    pub fn find_passwords<T: FnMut(&&protobufs::EncryptedPassword) -> bool>(
+        &mut self,
+        predicate: T,
+    ) -> Vec<DecryptedPassword> {
+        let encryptor = &mut self.encryptor;
+        self.lockbox
+            .encrypted_passwords
+            .iter()
+            .filter(predicate)
+            .map(|p| Self::decrypt_password(encryptor, p).unwrap())
+            .collect()
     }
 
     pub fn save(&mut self) -> Result<(), Error> {
@@ -181,19 +180,6 @@ impl Lockbox {
         };
         write(&self.file_path, encrypted_lockbox.encode_to_vec())?;
         Ok(())
-    }
-
-    fn find_passwords<T: FnMut(&&protobufs::EncryptedPassword) -> bool>(
-        &mut self,
-        predicate: T,
-    ) -> Vec<DecryptedPassword> {
-        let encryptor = &mut self.encryptor;
-        self.lockbox
-            .encrypted_passwords
-            .iter()
-            .filter(predicate)
-            .map(|p| Self::decrypt_password(encryptor, p).unwrap())
-            .collect()
     }
 
     fn decrypt_password(
@@ -266,7 +252,7 @@ mod tests {
         lockbox.save().unwrap();
 
         let mut lockbox2 = Lockbox::load(lockbox_file, MASTER_PASSWORD).unwrap();
-        let password = lockbox2.find_passwords_by_url("https://amazon.com");
+        let password = lockbox2.find_passwords(|p| p.url == "https://amazon.com");
         assert_eq!(password.first().unwrap().password, "password-123");
     }
 
@@ -297,7 +283,7 @@ mod tests {
 
         let mut lockbox2 = Lockbox::load(lockbox_file, MASTER_PASSWORD).unwrap();
         let decrypted = &lockbox2
-            .find_passwords_by_url("https://alibaba.com")
+            .find_passwords(|p| p.url == "https://alibaba.com")
             .first()
             .map(|p| p.clone())
             .unwrap();
@@ -321,7 +307,7 @@ mod tests {
 
         let mut lockbox2 = Lockbox::load(lockbox_file, MASTER_PASSWORD).unwrap();
         let password = lockbox2
-            .find_passwords_by_url("https://amazon.com")
+            .find_passwords(|p| p.url == "https://amazon.com")
             .first()
             .map(|p| p.clone())
             .unwrap();

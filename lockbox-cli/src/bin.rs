@@ -56,18 +56,14 @@ pub fn main() -> Result<(), Error> {
         Opt::Get(command) => {
             let path = get_filename(command.name.as_deref())?;
             let mut lockbox = Lockbox::load(&path, &command.master_password)?;
-
-            let passwords = if let Some(id) = command.id {
-                lockbox
-                    .find_password_by_id(&id)
-                    .map_or(Vec::new(), |p| vec![p])
-            } else if let Some(url) = command.url {
-                lockbox.find_passwords_by_url(&url)
-            } else if let Some(username) = command.username {
-                lockbox.find_passwords_by_username(&username)
-            } else {
-                Vec::new()
-            };
+            let passwords = lockbox.find_passwords(|p| {
+                command.id.as_ref().map_or(true, |id| p.id.eq(id))
+                    && command.url.as_ref().map_or(true, |url| p.url.contains(url))
+                    && command
+                        .username
+                        .as_ref()
+                        .map_or(true, |username| p.username.contains(username))
+            });
 
             for password in passwords {
                 println!(
