@@ -7,6 +7,8 @@ edition = "2021"
 lockbox = { path ="../lockbox" }
 structopt = "*"
 dirs = "*"
+csv = "*"
+serde = { version ="*", features = ["derive"] }
 
 [[bin]]
 name = "lockbox"

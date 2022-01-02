@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
@@ -8,6 +9,7 @@ pub enum Opt {
     Edit(EditCommand),
     List(ListCommand),
     Decrypt(FindByIdCommand),
+    ImportLastPass(ImportLastPassCommand),
 }
 
 #[derive(Debug, StructOpt)]
@@ -83,4 +85,16 @@ pub struct FindByIdCommand {
 
     #[structopt(short = "i", long = "id")]
     pub id: String,
+}
+
+#[derive(Debug, StructOpt)]
+pub struct ImportLastPassCommand {
+    #[structopt(short = "n", long = "name")]
+    pub name: Option<String>,
+
+    #[structopt(short = "m", long = "master-password")]
+    pub master_password: String,
+
+    #[structopt(short = "f", long = "file")]
+    pub file: PathBuf,
 }

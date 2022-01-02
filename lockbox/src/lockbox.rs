@@ -100,7 +100,6 @@ impl Lockbox {
             .encrypted_passwords
             .push(encrypted_password.clone());
 
-        self.save()?;
         Ok(encrypted_password)
     }
 
@@ -145,7 +144,7 @@ impl Lockbox {
                 Some(self.encryptor.encrypt(&decrypted_fields.encode_to_vec())?);
         }
 
-        self.save()
+        Ok(())
     }
 
     pub fn get_encrypted_passwords(&self) -> &[protobufs::EncryptedPassword] {
@@ -160,7 +159,7 @@ impl Lockbox {
         self.find_password(|p| p.url == url)
     }
 
-    fn save(&mut self) -> Result<(), Error> {
+    pub fn save(&mut self) -> Result<(), Error> {
         match self.file_path.parent() {
             None => (),
             Some(p) => create_dir_all(p)?,
@@ -256,6 +255,8 @@ mod tests {
             )
             .unwrap();
 
+        lockbox.save().unwrap();
+
         let mut lockbox2 = Lockbox::load(lockbox_file, MASTER_PASSWORD).unwrap();
         let password = lockbox2.find_password_by_url("https://amazon.com");
         assert_eq!(password.unwrap().password, "password-123");
@@ -284,6 +285,7 @@ mod tests {
                 Some(String::from("notes")),
             )
             .unwrap();
+        lockbox.save().unwrap();
 
         let mut lockbox2 = Lockbox::load(lockbox_file, MASTER_PASSWORD).unwrap();
         let decrypted = &lockbox2
@@ -305,6 +307,7 @@ mod tests {
                 Some(String::from("notes")),
             )
             .unwrap();
+        lockbox.save().unwrap();
 
         let mut lockbox2 = Lockbox::load(lockbox_file, MASTER_PASSWORD).unwrap();
         let password = lockbox2.find_password_by_url("https://amazon.com").unwrap();

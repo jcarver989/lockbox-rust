@@ -1,5 +1,7 @@
+pub mod import;
 pub mod opt;
 use dirs::home_dir;
+use import::import_from_lastpass;
 use lockbox::error::Error;
 use lockbox::Lockbox;
 use opt::Opt;
@@ -17,6 +19,13 @@ pub fn main() -> Result<(), Error> {
             Ok(())
         }
 
+        Opt::ImportLastPass(command) => {
+            let path = get_filename(command.name.as_deref())?;
+            let mut lockbox = Lockbox::create(&path, &command.master_password)?;
+            import_from_lastpass(&command.file, &mut lockbox).unwrap();
+            Ok(())
+        }
+
         Opt::Add(command) => {
             let path = get_filename(command.name.as_deref())?;
             let mut lockbox = Lockbox::load(&path, &command.master_password)?;
@@ -26,7 +35,8 @@ pub fn main() -> Result<(), Error> {
                 command.password,
                 command.notes,
             )?;
-            Ok(())
+
+            lockbox.save()
         }
 
         Opt::Edit(command) => {
@@ -38,7 +48,9 @@ pub fn main() -> Result<(), Error> {
                 command.username,
                 command.password,
                 command.notes,
-            )
+            )?;
+
+            lockbox.save()
         }
 
         Opt::Decrypt(command) => {
