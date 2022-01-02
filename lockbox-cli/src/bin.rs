@@ -53,18 +53,29 @@ pub fn main() -> Result<(), Error> {
             lockbox.save()
         }
 
-        Opt::Decrypt(command) => {
+        Opt::Get(command) => {
             let path = get_filename(command.name.as_deref())?;
             let mut lockbox = Lockbox::load(&path, &command.master_password)?;
-            let decrypted_password = lockbox.find_password_by_id(&command.id).unwrap();
-            println!(
-                "{}, {}, {}, {}, {}",
-                decrypted_password.id,
-                decrypted_password.url,
-                decrypted_password.username,
-                decrypted_password.password,
-                decrypted_password.notes
-            );
+
+            let passwords = if let Some(id) = command.id {
+                lockbox
+                    .find_password_by_id(&id)
+                    .map_or(Vec::new(), |p| vec![p])
+            } else if let Some(url) = command.url {
+                lockbox.find_passwords_by_url(&url)
+            } else if let Some(username) = command.username {
+                lockbox.find_passwords_by_username(&username)
+            } else {
+                Vec::new()
+            };
+
+            for password in passwords {
+                println!(
+                    "{}, {}, {}, {}, {}",
+                    password.id, password.url, password.username, password.password, password.notes
+                );
+            }
+
             Ok(())
         }
 

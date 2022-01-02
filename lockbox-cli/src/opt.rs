@@ -5,11 +5,11 @@ use structopt::StructOpt;
 #[structopt(name = "lockbox", about = "A CLI for password management")]
 pub enum Opt {
     New(NewCommand),
-    Add(AddCommand),
-    Edit(EditCommand),
-    List(ListCommand),
-    Decrypt(FindByIdCommand),
-    ImportLastPass(ImportLastPassCommand),
+    Add(AddPasswordCommand),
+    Edit(EditPasswordCommand),
+    List(ListPasswordsCommand),
+    Get(GetPasswordsCommand),
+    ImportLastPass(ImportPasswordsFromLastPassCommand),
 }
 
 #[derive(Debug, StructOpt)]
@@ -22,7 +22,7 @@ pub struct NewCommand {
 }
 
 #[derive(Debug, StructOpt)]
-pub struct AddCommand {
+pub struct AddPasswordCommand {
     #[structopt(short = "n", long = "name")]
     pub name: Option<String>,
 
@@ -43,7 +43,7 @@ pub struct AddCommand {
 }
 
 #[derive(Debug, StructOpt)]
-pub struct EditCommand {
+pub struct EditPasswordCommand {
     #[structopt(short = "n", long = "name")]
     pub name: Option<String>,
 
@@ -67,7 +67,7 @@ pub struct EditCommand {
 }
 
 #[derive(Debug, StructOpt)]
-pub struct ListCommand {
+pub struct ListPasswordsCommand {
     #[structopt(short = "m", long = "master-password")]
     pub master_password: String,
 
@@ -76,19 +76,25 @@ pub struct ListCommand {
 }
 
 #[derive(Debug, StructOpt)]
-pub struct FindByIdCommand {
+pub struct GetPasswordsCommand {
     #[structopt(short = "n", long = "name")]
     pub name: Option<String>,
 
     #[structopt(short = "m", long = "master-password")]
     pub master_password: String,
 
-    #[structopt(short = "i", long = "id")]
-    pub id: String,
+    #[structopt(long = "id")]
+    pub id: Option<String>,
+
+    #[structopt(long = "url")]
+    pub url: Option<String>,
+
+    #[structopt(long = "username")]
+    pub username: Option<String>,
 }
 
 #[derive(Debug, StructOpt)]
-pub struct ImportLastPassCommand {
+pub struct ImportPasswordsFromLastPassCommand {
     #[structopt(short = "n", long = "name")]
     pub name: Option<String>,
 
