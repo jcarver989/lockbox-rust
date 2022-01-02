@@ -68,7 +68,11 @@ pub fn main() -> Result<(), Error> {
             for password in passwords {
                 println!(
                     "{}, {}, {}, {}, {}",
-                    password.id, password.url, password.username, password.password, password.notes
+                    password.id,
+                    password.url.split("?").next().unwrap(),
+                    password.username,
+                    password.password,
+                    password.notes
                 );
             }
 
@@ -83,7 +87,9 @@ pub fn main() -> Result<(), Error> {
             for password in passwords {
                 println!(
                     "{}, {}, {}",
-                    &password.id, &password.url, &password.username
+                    &password.id,
+                    &password.url.split("?").next().unwrap(),
+                    &password.username
                 );
             }
 
