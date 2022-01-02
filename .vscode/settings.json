@@ -1,0 +1,5 @@
+{
+  "rust-analyzer.inlayHints.typeHints": false,
+  "rust-analyzer.inlayHints.parameterHints": false,
+  "editor.formatOnSave": true
+}

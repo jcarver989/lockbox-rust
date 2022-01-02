@@ -1,0 +1,19 @@
+[package]
+name = "lockbox"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bytes = "*"
+prost = "*"
+xsalsa20poly1305 = "*"
+argon2 = "*"
+rand = "*"
+zeroize = "*"
+
+[build-dependencies]
+prost-build = "*"
+
+[lib]
+name = "lockbox"
+path = "src/lib.rs"
