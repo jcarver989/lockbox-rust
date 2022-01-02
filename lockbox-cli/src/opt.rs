@@ -17,7 +17,12 @@ pub struct NewCommand {
     #[structopt(short = "n", long = "name")]
     pub name: Option<String>,
 
-    #[structopt(short = "m", long = "master-password")]
+    #[structopt(
+        short = "m",
+        long = "master-password",
+        env = "MASTER_PASSWORD",
+        hide_env_values = true
+    )]
     pub master_password: String,
 }
 
@@ -26,7 +31,12 @@ pub struct AddPasswordCommand {
     #[structopt(short = "n", long = "name")]
     pub name: Option<String>,
 
-    #[structopt(short = "m", long = "master-password")]
+    #[structopt(
+        short = "m",
+        long = "master-password",
+        env = "MASTER_PASSWORD",
+        hide_env_values = true
+    )]
     pub master_password: String,
 
     #[structopt(short = "u", long = "username")]
@@ -47,7 +57,12 @@ pub struct EditPasswordCommand {
     #[structopt(short = "n", long = "name")]
     pub name: Option<String>,
 
-    #[structopt(short = "m", long = "master-password")]
+    #[structopt(
+        short = "m",
+        long = "master-password",
+        env = "MASTER_PASSWORD",
+        hide_env_values = true
+    )]
     pub master_password: String,
 
     #[structopt(long = "id")]
@@ -68,7 +83,12 @@ pub struct EditPasswordCommand {
 
 #[derive(Debug, StructOpt)]
 pub struct ListPasswordsCommand {
-    #[structopt(short = "m", long = "master-password")]
+    #[structopt(
+        short = "m",
+        long = "master-password",
+        env = "MASTER_PASSWORD",
+        hide_env_values = true
+    )]
     pub master_password: String,
 
     #[structopt(short = "n", long = "name")]
@@ -80,7 +100,12 @@ pub struct GetPasswordsCommand {
     #[structopt(short = "n", long = "name")]
     pub name: Option<String>,
 
-    #[structopt(short = "m", long = "master-password")]
+    #[structopt(
+        short = "m",
+        long = "master-password",
+        env = "MASTER_PASSWORD",
+        hide_env_values = true
+    )]
     pub master_password: String,
 
     #[structopt(long = "id")]
@@ -98,7 +123,12 @@ pub struct ImportPasswordsFromLastPassCommand {
     #[structopt(short = "n", long = "name")]
     pub name: Option<String>,
 
-    #[structopt(short = "m", long = "master-password")]
+    #[structopt(
+        short = "m",
+        long = "master-password",
+        env = "MASTER_PASSWORD",
+        hide_env_values = true
+    )]
     pub master_password: String,
 
     #[structopt(short = "f", long = "file")]
