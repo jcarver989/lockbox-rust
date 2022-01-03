@@ -26,9 +26,17 @@ pub fn derive_master_key_from_password(password: &str, salt: &Salt) -> Result<Ma
 }
 
 pub fn generate_data_key(rng: &mut impl Rng) -> DataKey {
+    DataKey::new(generate_key(rng))
+}
+
+pub fn generate_master_key(rng: &mut impl Rng) -> MasterKey {
+    MasterKey::new(generate_key(rng))
+}
+
+fn generate_key(rng: &mut impl Rng) -> Vec<u8> {
     let mut key_bytes = vec![0; KEY_SIZE];
     rng.fill_bytes(&mut key_bytes);
-    DataKey::new(key_bytes)
+    key_bytes
 }
 
 pub fn generate_nonce(rng: &mut impl Rng) -> Nonce {

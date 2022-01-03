@@ -1,5 +1,6 @@
 use crate::encryption::{
-    data_types::Salt, derive_master_key_from_password, generate_salt, Encryptor,
+    data_types::Salt, derive_master_key_from_password, generate_master_key, generate_salt,
+    Encryptor,
 };
 use prost::Message;
 use rand::prelude::*;
@@ -11,9 +12,29 @@ use std::path::{Path, PathBuf};
 use crate::error::Error;
 use crate::protobufs;
 
+/// High-level struct for working with a "Lockbox" (encrypted file containing passwords).
+/// Each Lockbox is stored as an encrypted file on disk, which contains a serialized protobufs::Lockbox object.
+///
+///  - Files are encrypted using a unique randomly generated "MasterKey"
+///
+///  - This "MasterKey" is encrypted using a key derived from a user specified password. And the encrypted key is stored in the Lockbox file. This
+///    makes it easy for users to rotate their passwords it only requires re-encrypting the Lockbox's "MasterKey".
+///
+///  - Each password is encrypted with a unqiue randomly generated "DataKey". And this DataKey is encrypted using the Lockbox's MasterKey.
+///    This allows (future) sharing of password items, by encrypting their data-key(s) with the intended recipient's public key.
 pub struct Lockbox {
+    /// The underlying protobuf object that will be encrypted + serialized to disk on save()
     lockbox: protobufs::Lockbox,
-    encryptor: Encryptor<StdRng>,
+
+    /// The Encryptor used to encrypt the Lockbox file.
+    /// It performs envelope encryption using a MasterKey derived from a user provided password
+    lockbox_encryptor: Encryptor<StdRng>,
+
+    /// The Encryptor used to encrypt passwords within this Lockbox.
+    /// It performs envelope encryption using a randomly generated MasterKey that's unique per Lockbox file.
+    password_encryptor: Encryptor<StdRng>,
+
+    /// The randomly generated salt us
     master_key_salt: Salt,
     file_path: PathBuf,
 }
@@ -29,16 +50,25 @@ pub struct DecryptedPassword {
 
 impl Lockbox {
     pub fn create(file_path: &Path, master_password: &str) -> Result<Lockbox, Error> {
-        let (encryptor, master_key_salt) = {
-            let mut rng = StdRng::from_entropy();
-            let master_key_salt = generate_salt(&mut rng);
+        let mut std_rng = StdRng::from_entropy();
+        let master_key_salt = generate_salt(&mut std_rng);
+
+        let lockbox_encryptor = {
+            let rng = std_rng.clone();
             let master_key = derive_master_key_from_password(master_password, &master_key_salt)?;
-            (Encryptor::new(rng, master_key), master_key_salt)
+            Encryptor::new(rng, master_key)
+        };
+
+        let password_encryptor = {
+            let mut rng = std_rng.clone();
+            let master_key = generate_master_key(&mut rng);
+            Encryptor::new(rng, master_key)
         };
 
         let mut lockbox = Lockbox {
             lockbox: protobufs::Lockbox::default(),
-            encryptor,
+            lockbox_encryptor,
+            password_encryptor,
             master_key_salt,
             file_path: file_path.to_owned(),
         };
@@ -50,30 +80,30 @@ impl Lockbox {
     pub fn load(file_path: &Path, master_password: &str) -> Result<Lockbox, Error> {
         let (encrypted_lockbox, master_key_salt) = {
             let bytes = Cursor::new(read(file_path)?);
-            let encrypted_lockbox = protobufs::EncryptedLockboxFile::decode(bytes)?;
+            let lockbox_file = protobufs::EncryptedLockboxFile::decode(bytes)?;
             (
-                encrypted_lockbox
-                    .lockbox
-                    .ok_or(Error::new_invalid_data_error(
-                        "EncryptedLockboxFile 'lockbox' field was None",
-                    ))?,
-                Salt::new(encrypted_lockbox.master_key_salt),
+                lockbox_file.lockbox.ok_or(Error::new_invalid_data_error(
+                    "EncryptedLockboxFile 'lockbox' field was None",
+                ))?,
+                Salt::new(lockbox_file.master_key_salt),
             )
         };
 
-        let mut encryptor = {
+        let rng = StdRng::from_entropy();
+        let mut lockbox_encryptor = {
             let master_key = derive_master_key_from_password(master_password, &master_key_salt)?;
-            Encryptor::new(StdRng::from_entropy(), master_key)
+            Encryptor::new(rng.clone(), master_key)
         };
 
-        let lockbox = {
-            let bytes = encryptor.decrypt(&encrypted_lockbox)?;
-            protobufs::Lockbox::decode(Cursor::new(&bytes))?
-        };
+        let decrypted_lockbox = lockbox_encryptor.decrypt(&encrypted_lockbox)?;
+        let lockbox = protobufs::Lockbox::decode(Cursor::new(&decrypted_lockbox.bytes))?;
+        let password_encryptor =
+            Encryptor::new(rng.clone(), decrypted_lockbox.data_key.to_master_key());
 
         Ok(Lockbox {
             lockbox,
-            encryptor,
+            lockbox_encryptor,
+            password_encryptor,
             master_key_salt,
             file_path: file_path.to_owned(),
         })
@@ -87,15 +117,18 @@ impl Lockbox {
         notes: Option<String>,
     ) -> Result<protobufs::EncryptedPassword, Error> {
         let mut encrypted_password = protobufs::EncryptedPassword::default();
-        encrypted_password.id = self.encryptor.generate_random_id();
+        encrypted_password.id = self.password_encryptor.generate_random_id();
         encrypted_password.username = username;
         encrypted_password.url = url;
-        encrypted_password.encrypted_fields = Some({
+        encrypted_password.encrypted_fields = {
             let mut password_fields = protobufs::DecryptedPasswordFields::default();
             password_fields.password = password;
             password_fields.notes = notes.unwrap_or("".to_owned());
-            self.encryptor.encrypt(&password_fields.encode_to_vec())?
-        });
+            let encrypted_fields = self
+                .password_encryptor
+                .encrypt(&password_fields.encode_to_vec())?;
+            Some(encrypted_fields)
+        };
 
         self.lockbox
             .encrypted_passwords
@@ -131,7 +164,7 @@ impl Lockbox {
 
         if password.is_some() || notes.is_some() {
             let mut decrypted_fields =
-                Self::decrypt_password_fields(&mut self.encryptor, encrypted_password)?;
+                Self::decrypt_password_fields(&mut self.password_encryptor, encrypted_password)?;
 
             if let Some(new_password) = password {
                 decrypted_fields.password = new_password;
@@ -141,8 +174,10 @@ impl Lockbox {
                 decrypted_fields.notes = new_notes;
             }
 
-            encrypted_password.encrypted_fields =
-                Some(self.encryptor.encrypt(&decrypted_fields.encode_to_vec())?);
+            encrypted_password.encrypted_fields = Some(
+                self.password_encryptor
+                    .encrypt(&decrypted_fields.encode_to_vec())?,
+            );
         }
 
         Ok(())
@@ -156,7 +191,7 @@ impl Lockbox {
         &mut self,
         predicate: T,
     ) -> Vec<DecryptedPassword> {
-        let encryptor = &mut self.encryptor;
+        let encryptor = &mut self.password_encryptor;
         self.lockbox
             .encrypted_passwords
             .iter()
@@ -166,18 +201,20 @@ impl Lockbox {
     }
 
     pub fn save(&mut self) -> Result<(), Error> {
-        match self.file_path.parent() {
-            None => (),
-            Some(p) => create_dir_all(p)?,
+        if let Some(dir) = self.file_path.parent() {
+            create_dir_all(dir)?;
         };
 
-        let encrypted_lockbox = {
-            let mut encrypted_lockbox = protobufs::EncryptedLockboxFile::default();
-            let lockbox_bytes = self.lockbox.encode_to_vec();
-            encrypted_lockbox.lockbox = Some(self.encryptor.encrypt(&lockbox_bytes)?);
-            encrypted_lockbox.master_key_salt = self.master_key_salt.as_str().to_string();
-            encrypted_lockbox
+        let mut encrypted_lockbox = protobufs::EncryptedLockboxFile::default();
+        encrypted_lockbox.master_key_salt = self.master_key_salt.as_str().to_string();
+        encrypted_lockbox.lockbox = {
+            let encrypted_lockbox = self.lockbox_encryptor.encrypt_with_data_key(
+                &self.lockbox.encode_to_vec(),
+                self.password_encryptor.get_master_key(),
+            )?;
+            Some(encrypted_lockbox)
         };
+
         write(&self.file_path, encrypted_lockbox.encode_to_vec())?;
         Ok(())
     }
@@ -203,8 +240,9 @@ impl Lockbox {
     ) -> Result<protobufs::DecryptedPasswordFields, Error> {
         encryptor
             .decrypt(encrypted_password.encrypted_fields.as_ref().unwrap())
-            .and_then(|bytes| {
-                protobufs::DecryptedPasswordFields::decode(Cursor::new(bytes)).map_err(Error::from)
+            .and_then(|decrypted_object| {
+                protobufs::DecryptedPasswordFields::decode(Cursor::new(decrypted_object.bytes))
+                    .map_err(Error::from)
             })
     }
 }

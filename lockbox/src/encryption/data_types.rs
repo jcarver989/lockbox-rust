@@ -43,6 +43,11 @@ impl Drop for MasterKey {
 
 /// A Data Encryption Key which is used to encrypt/decrypt data
 pub struct DataKey(Vec<u8>);
+impl DataKey {
+    pub fn to_master_key(&self) -> MasterKey {
+        MasterKey::new(self.0.clone())
+    }
+}
 
 impl EncryptionKey for DataKey {}
 impl ByteVec for DataKey {

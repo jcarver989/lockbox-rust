@@ -31,6 +31,8 @@ message DecryptedPasswordFields {
   string notes = 2;
 }
 
+message DecryptedSessionFile { bytes master_key = 1; }
+
 /** A generic encrypted object. Each object is encrypted with a
  *  unique data key, which is in turn encrypted with the master password.
  */

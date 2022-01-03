@@ -65,7 +65,7 @@ pub fn main() -> Result<(), Error> {
 
             for password in passwords {
                 println!(
-                    "{}, {}, {}, {}, {}",
+                    "{}\t{}\t{}\t{}\t{}",
                     password.id,
                     password.url.split("?").next().unwrap(),
                     password.username,
@@ -84,7 +84,7 @@ pub fn main() -> Result<(), Error> {
 
             for password in passwords {
                 println!(
-                    "{}, {}, {}",
+                    "{}\t{}\t{}",
                     &password.id,
                     &password.url.split("?").next().unwrap(),
                     &password.username
